@@ -1,0 +1,288 @@
+import React, { useEffect, useState } from 'react';
+import {
+  Table, Select, Button, Typography, Tag, Space,
+  message, Row, Col, Card, Tooltip, Modal, Form,
+} from 'antd';
+import {
+  SafetyCertificateOutlined, PlusOutlined, UserOutlined,
+} from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+import { projectApi, userApi } from '@/api';
+import type { ProjectDto, UserDto, ProjectRole } from '@/types';
+
+const { Title, Text } = Typography;
+
+const ROLE_CONFIG: Record<ProjectRole, { color: string; label: string; desc: string }> = {
+  SYSTEM_ADMIN: { color: 'red', label: '시스템 관리자', desc: '전체 시스템 접근' },
+  PROJECT_MANAGER: { color: 'purple', label: 'PM', desc: 'WBS 전체 편집, 팀 관리' },
+  TEAM_LEAD: { color: 'blue', label: '팀장', desc: '팀 작업 편집, 리포트' },
+  DEVELOPER: { color: 'cyan', label: '팀원', desc: '담당 작업 진척 입력' },
+  VIEWER: { color: 'default', label: '열람자', desc: '조회만 가능' },
+  REPORTER: { color: 'green', label: '보고서 담당', desc: '리포트 생성/Confluence 게시' },
+};
+
+interface MemberRow {
+  key: string;
+  userId: number;
+  displayName: string;
+  username: string;
+  email: string;
+  role: ProjectRole;
+}
+
+const PermissionPage: React.FC = () => {
+  const [projects, setProjects] = useState<ProjectDto[]>([]);
+  const [users, setUsers] = useState<UserDto[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [members, setMembers] = useState<MemberRow[]>([]);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [form] = Form.useForm();
+
+  useEffect(() => {
+    Promise.all([projectApi.findAll(), userApi.findAll()]).then(([p, u]) => {
+      setProjects(p);
+      setUsers(u);
+      if (p.length > 0) setSelectedProjectId(p[0].projectId);
+    });
+  }, []);
+
+  // Simulated members — real impl calls /projects/:id/members
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    setMembers(
+      users.slice(0, 4).map((u, i) => ({
+        key: String(u.userId),
+        userId: u.userId,
+        displayName: u.displayName,
+        username: u.username,
+        email: u.email,
+        role: (['PROJECT_MANAGER', 'TEAM_LEAD', 'DEVELOPER', 'VIEWER'] as ProjectRole[])[i] ?? 'VIEWER',
+      }))
+    );
+  }, [selectedProjectId, users]);
+
+  const handleRoleChange = (userId: number, role: ProjectRole) => {
+    setMembers((prev) =>
+      prev.map((m) => (m.userId === userId ? { ...m, role } : m))
+    );
+    message.success('권한이 변경되었습니다.');
+  };
+
+  const handleAddMember = (values: { userId: number; role: ProjectRole }) => {
+    const user = users.find((u) => u.userId === values.userId);
+    if (!user) return;
+    if (members.some((m) => m.userId === values.userId)) {
+      message.warning('이미 추가된 사용자입니다.');
+      return;
+    }
+    setMembers((prev) => [
+      ...prev,
+      {
+        key: String(user.userId),
+        userId: user.userId,
+        displayName: user.displayName,
+        username: user.username,
+        email: user.email,
+        role: values.role,
+      },
+    ]);
+    message.success(`${user.displayName}이(가) 추가되었습니다.`);
+    setAddModalOpen(false);
+    form.resetFields();
+  };
+
+  const columns: ColumnsType<MemberRow> = [
+    {
+      title: '사용자',
+      key: 'user',
+      width: 200,
+      render: (_, r) => (
+        <Space>
+          <div
+            style={{
+              width: 30, height: 30, borderRadius: '50%',
+              background: '#4472C4', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <UserOutlined style={{ color: '#fff', fontSize: 13 }} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>{r.displayName}</div>
+            <div style={{ fontSize: 11, color: '#aaa' }}>@{r.username}</div>
+          </div>
+        </Space>
+      ),
+    },
+    {
+      title: '이메일',
+      dataIndex: 'email',
+      key: 'email',
+      width: 220,
+      render: (v) => <Text style={{ fontSize: 12, color: '#666' }}>{v}</Text>,
+    },
+    {
+      title: '현재 역할',
+      key: 'roleTag',
+      width: 130,
+      render: (_, r) => {
+        const cfg = ROLE_CONFIG[r.role];
+        return (
+          <Tooltip title={cfg.desc}>
+            <Tag color={cfg.color}>{cfg.label}</Tag>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: '역할 변경',
+      key: 'roleChange',
+      width: 180,
+      render: (_, r) => (
+        <Select
+          value={r.role}
+          size="small"
+          style={{ width: 160 }}
+          onChange={(v) => handleRoleChange(r.userId, v)}
+          options={Object.entries(ROLE_CONFIG).map(([k, v]) => ({
+            value: k,
+            label: (
+              <Space size={4}>
+                <Tag color={v.color} style={{ margin: 0 }}>{v.label}</Tag>
+              </Space>
+            ),
+          }))}
+        />
+      ),
+    },
+    {
+      title: '액션',
+      key: 'action',
+      width: 80,
+      render: (_, r) => (
+        <Button
+          size="small"
+          danger
+          ghost
+          onClick={() => {
+            setMembers((prev) => prev.filter((m) => m.userId !== r.userId));
+            message.success('프로젝트에서 제외되었습니다.');
+          }}
+        >
+          제외
+        </Button>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 20 }}>
+        <Col>
+          <Title level={4} style={{ margin: 0, color: '#1F4E79' }}>
+            권한 관리
+          </Title>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            프로젝트별 사용자 역할(RBAC)을 설정합니다.
+          </Text>
+        </Col>
+        <Col>
+          <Space>
+            <Select
+              style={{ width: 240 }}
+              placeholder="프로젝트 선택"
+              value={selectedProjectId}
+              onChange={setSelectedProjectId}
+              options={projects.map((p) => ({ value: p.projectId, label: p.name }))}
+            />
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setAddModalOpen(true)}
+            >
+              사용자 추가
+            </Button>
+          </Space>
+        </Col>
+      </Row>
+
+      {/* Role Guide */}
+      <Row gutter={8} style={{ marginBottom: 20 }}>
+        {Object.entries(ROLE_CONFIG).map(([k, v]) => (
+          <Col key={k}>
+            <Card
+              size="small"
+              style={{ borderRadius: 8, minWidth: 120, textAlign: 'center' }}
+              bodyStyle={{ padding: '8px 12px' }}
+            >
+              <Tag color={v.color} style={{ marginBottom: 4 }}>{v.label}</Tag>
+              <div style={{ fontSize: 11, color: '#888' }}>{v.desc}</div>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      <Table
+        dataSource={members}
+        columns={columns}
+        rowKey="userId"
+        size="small"
+        pagination={false}
+        style={{ borderRadius: 8 }}
+      />
+
+      {/* Add Member Modal */}
+      <Modal
+        title={
+          <Space>
+            <SafetyCertificateOutlined style={{ color: '#2E75B6' }} />
+            <span>사용자 추가</span>
+          </Space>
+        }
+        open={addModalOpen}
+        onCancel={() => { setAddModalOpen(false); form.resetFields(); }}
+        onOk={() => form.submit()}
+        okText="추가"
+        cancelText="취소"
+        width={440}
+      >
+        <Form form={form} layout="vertical" onFinish={handleAddMember} style={{ marginTop: 16 }}>
+          <Form.Item
+            name="userId"
+            label="사용자"
+            rules={[{ required: true, message: '사용자를 선택하세요' }]}
+          >
+            <Select
+              showSearch
+              placeholder="이름 또는 아이디로 검색"
+              options={users
+                .filter((u) => !members.some((m) => m.userId === u.userId))
+                .map((u) => ({
+                  value: u.userId,
+                  label: `${u.displayName} (@${u.username})`,
+                }))}
+              filterOption={(input, opt) =>
+                String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+            />
+          </Form.Item>
+          <Form.Item
+            name="role"
+            label="역할"
+            initialValue="DEVELOPER"
+            rules={[{ required: true }]}
+          >
+            <Select
+              options={Object.entries(ROLE_CONFIG).map(([k, v]) => ({
+                value: k,
+                label: `${v.label} — ${v.desc}`,
+              }))}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+};
+
+export default PermissionPage;

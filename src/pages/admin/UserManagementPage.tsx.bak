@@ -1,0 +1,261 @@
+import React, { useEffect, useState } from 'react';
+import {
+  Table, Button, Space, Typography, Tag, Modal, Form,
+  Input, message, Popconfirm, Row, Col, Card,
+} from 'antd';
+import {
+  PlusOutlined, UserOutlined,
+  LockOutlined, CheckCircleOutlined,
+} from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+import { userApi } from '@/api';
+import type { UserDto, CreateUserRequest } from '@/types';
+import dayjs from 'dayjs';
+
+const { Title, Text } = Typography;
+
+const STATUS_CONFIG = {
+  ACTIVE: { color: 'success', label: '활성', icon: <CheckCircleOutlined /> },
+  INACTIVE: { color: 'default', label: '비활성', icon: <LockOutlined /> },
+  LOCKED: { color: 'error', label: '잠김', icon: <LockOutlined /> },
+} as const;
+
+const UserManagementPage: React.FC = () => {
+  const [users, setUsers] = useState<UserDto[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [form] = Form.useForm<CreateUserRequest>();
+  const [saving, setSaving] = useState(false);
+
+  const loadUsers = () => {
+    setLoading(true);
+    userApi.findAll()
+      .then(setUsers)
+      .catch(() => message.error('사용자 목록 로드 실패'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { loadUsers(); }, []);
+
+  const handleCreate = async (values: CreateUserRequest) => {
+    setSaving(true);
+    try {
+      const created = await userApi.create(values);
+      setUsers((prev) => [created, ...prev]);
+      message.success(`${created.displayName} 계정이 생성되었습니다.`);
+      setModalOpen(false);
+      form.resetFields();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message ?? '생성 실패';
+      message.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const columns: ColumnsType<UserDto> = [
+    {
+      title: '이름',
+      key: 'name',
+      width: 160,
+      render: (_, r) => (
+        <Space>
+          <div
+            style={{
+              width: 32, height: 32, borderRadius: '50%',
+              background: '#2E75B6', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <UserOutlined style={{ color: '#fff', fontSize: 14 }} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>{r.displayName}</div>
+            <div style={{ fontSize: 11, color: '#999' }}>@{r.username}</div>
+          </div>
+        </Space>
+      ),
+    },
+    {
+      title: '이메일',
+      dataIndex: 'email',
+      key: 'email',
+      width: 220,
+      render: (v) => <Text style={{ fontSize: 13 }}>{v}</Text>,
+    },
+    {
+      title: '연락처',
+      dataIndex: 'phone',
+      key: 'phone',
+      width: 140,
+      render: (v) => <Text style={{ fontSize: 13 }}>{v ?? '-'}</Text>,
+    },
+    {
+      title: '상태',
+      dataIndex: 'status',
+      key: 'status',
+      width: 90,
+      align: 'center',
+      render: (status: keyof typeof STATUS_CONFIG) => {
+        const cfg = STATUS_CONFIG[status];
+        return <Tag color={cfg.color}>{cfg.label}</Tag>;
+      },
+    },
+    {
+      title: '가입일',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 120,
+      render: (v) => (
+        <Text style={{ fontSize: 12, color: '#888' }}>
+          {dayjs(v).format('YYYY-MM-DD')}
+        </Text>
+      ),
+    },
+    {
+      title: '액션',
+      key: 'action',
+      width: 140,
+      render: (_, record) => (
+        <Space>
+          <Button size="small" ghost type="primary">편집</Button>
+          <Popconfirm
+            title="계정을 삭제하시겠습니까?"
+            okText="삭제"
+            cancelText="취소"
+            okType="danger"
+            onConfirm={() => message.info('삭제 기능 구현 예정')}
+          >
+            <Button size="small" danger ghost>삭제</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 20 }}>
+        <Col>
+          <Title level={4} style={{ margin: 0, color: '#1F4E79' }}>
+            계정 관리
+          </Title>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            시스템 사용자 계정을 관리합니다.
+          </Text>
+        </Col>
+        <Col>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setModalOpen(true)}
+          >
+            계정 생성
+          </Button>
+        </Col>
+      </Row>
+
+      {/* Stats */}
+      <Row gutter={12} style={{ marginBottom: 20 }}>
+        {[
+          { label: '전체', value: users.length, color: '#2E75B6' },
+          { label: '활성', value: users.filter((u) => u.status === 'ACTIVE').length, color: '#52c41a' },
+          { label: '비활성', value: users.filter((u) => u.status === 'INACTIVE').length, color: '#888' },
+          { label: '잠김', value: users.filter((u) => u.status === 'LOCKED').length, color: '#ff4d4f' },
+        ].map((s) => (
+          <Col key={s.label}>
+            <Card size="small" style={{ minWidth: 100, textAlign: 'center', borderRadius: 8 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
+              <Text type="secondary" style={{ fontSize: 12 }}>{s.label}</Text>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      <Table
+        dataSource={users}
+        columns={columns}
+        rowKey="userId"
+        loading={loading}
+        size="small"
+        pagination={{ pageSize: 20, showTotal: (t) => `총 ${t}명` }}
+        style={{ borderRadius: 8 }}
+      />
+
+      {/* Create User Modal */}
+      <Modal
+        title={
+          <Space>
+            <UserOutlined style={{ color: '#2E75B6' }} />
+            <span>계정 생성</span>
+          </Space>
+        }
+        open={modalOpen}
+        onCancel={() => { setModalOpen(false); form.resetFields(); }}
+        onOk={() => form.submit()}
+        okText="생성"
+        cancelText="취소"
+        confirmLoading={saving}
+        width={480}
+      >
+        <Form form={form} layout="vertical" onFinish={handleCreate} style={{ marginTop: 16 }}>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item
+                name="username"
+                label="아이디 (로그인 ID)"
+                rules={[
+                  { required: true, message: '아이디를 입력하세요' },
+                  { min: 3, message: '3자 이상 입력하세요' },
+                ]}
+              >
+                <Input prefix={<UserOutlined />} placeholder="예: hong.gildong" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="displayName"
+                label="표시 이름"
+                rules={[{ required: true, message: '이름을 입력하세요' }]}
+              >
+                <Input placeholder="예: 홍길동" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="email"
+            label="이메일"
+            rules={[
+              { required: true, message: '이메일을 입력하세요' },
+              { type: 'email', message: '올바른 이메일 형식이 아닙니다' },
+            ]}
+          >
+            <Input placeholder="예: hong@suwon.go.kr" />
+          </Form.Item>
+
+          <Form.Item
+            name="password"
+            label="초기 비밀번호"
+            rules={[
+              { required: true, message: '비밀번호를 입력하세요' },
+              { min: 8, message: '8자 이상 입력하세요' },
+            ]}
+          >
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="8자 이상, 영문/숫자/특수문자 조합"
+            />
+          </Form.Item>
+
+          <Form.Item name="phone" label="연락처 (선택)">
+            <Input placeholder="예: 010-1234-5678" />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+};
+
+export default UserManagementPage;

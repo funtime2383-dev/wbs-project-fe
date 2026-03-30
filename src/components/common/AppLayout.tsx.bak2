@@ -1,0 +1,134 @@
+import React, { useState } from 'react';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Layout, Menu, Avatar, Dropdown, Typography, Badge, Space } from 'antd';
+import {
+  DashboardOutlined, ProjectOutlined, TeamOutlined, UserOutlined,
+  LogoutOutlined, SettingOutlined, BellOutlined,
+  MenuFoldOutlined, MenuUnfoldOutlined, BarChartOutlined,
+} from '@ant-design/icons';
+import type { MenuProps } from 'antd';
+import { useAuthStore } from '@/store/authStore';
+import { authApi } from '@/api';
+
+const { Header, Sider, Content } = Layout;
+const { Text } = Typography;
+
+const MENU_ITEMS: MenuProps['items'] = [
+  { key: '/', icon: <DashboardOutlined />, label: '대시보드' },
+  {
+    key: '/wbs', icon: <ProjectOutlined />, label: 'WBS 관리',
+    children: [
+      { key: '/wbs/schedule', label: '일정 관리 (간트)' },
+      { key: '/wbs/progress', label: '담당자별 진행율' },
+      { key: '/wbs/workload', label: '워크로드 히트맵' },
+    ],
+  },
+  { key: '/teams', icon: <TeamOutlined />, label: '팀 관리' },
+  {
+    key: '/admin', icon: <SettingOutlined />, label: '관리',
+    children: [
+      { key: '/admin/users', label: '계정 관리' },
+      { key: '/admin/permissions', label: '권한 관리' },
+    ],
+  },
+];
+
+const AppLayout: React.FC = () => {
+  const [collapsed, setCollapsed] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, clearAuth } = useAuthStore();
+
+  const handleLogout = async () => {
+    try { await authApi.logout(); } catch { /* ignore */ }
+    clearAuth();
+    navigate('/login');
+  };
+
+  const userMenu: MenuProps['items'] = [
+    { key: 'profile', icon: <UserOutlined />, label: '내 프로필' },
+    { type: 'divider' },
+    { key: 'logout', icon: <LogoutOutlined />, label: '로그아웃', danger: true },
+  ];
+
+  return (
+    <Layout style={{ minHeight: '100vh' }}>
+      <Sider
+        collapsible
+        collapsed={collapsed}
+        trigger={null}
+        width={220}
+        style={{ background: '#1F4E79' }}
+      >
+        <div style={{
+          height: 56, display: 'flex', alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          padding: collapsed ? 0 : '0 18px',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+        }}>
+          <BarChartOutlined style={{ fontSize: 20, color: '#fff' }} />
+          {!collapsed && (
+            <Text strong style={{ color: '#fff', marginLeft: 10, fontSize: 13, whiteSpace: 'nowrap' }}>
+              WBS 관리시스템
+            </Text>
+          )}
+        </div>
+        <Menu
+          theme="dark"
+          mode="inline"
+          selectedKeys={[location.pathname]}
+          defaultOpenKeys={['/wbs', '/admin']}
+          items={MENU_ITEMS}
+          onClick={({ key }) => navigate(key)}
+          style={{ background: '#1F4E79', borderRight: 0, marginTop: 6 }}
+        />
+      </Sider>
+
+      <Layout>
+        <Header style={{
+          background: '#fff',
+          padding: '0 20px',
+          height: 52,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxShadow: '0 1px 4px rgba(0,21,41,0.08)',
+        }}>
+          <Space>
+            {collapsed
+              ? <MenuUnfoldOutlined style={{ fontSize: 17, cursor: 'pointer', color: '#555' }} onClick={() => setCollapsed(false)} />
+              : <MenuFoldOutlined   style={{ fontSize: 17, cursor: 'pointer', color: '#555' }} onClick={() => setCollapsed(true)} />
+            }
+          </Space>
+          <Space size={14}>
+            <Badge count={0} showZero={false}>
+              <BellOutlined style={{ fontSize: 17, color: '#555', cursor: 'pointer' }} />
+            </Badge>
+            <Dropdown
+              menu={{ items: userMenu, onClick: ({ key }) => key === 'logout' && handleLogout() }}
+              placement="bottomRight"
+            >
+              <Space style={{ cursor: 'pointer' }}>
+                <Avatar size={30} style={{ background: '#2E75B6' }} icon={<UserOutlined />} />
+                <Text style={{ fontSize: 13 }}>{user?.displayName}</Text>
+              </Space>
+            </Dropdown>
+          </Space>
+        </Header>
+
+        <Content style={{
+          margin: '14px 18px',
+          padding: '18px 22px',
+          background: '#fff',
+          borderRadius: 8,
+          minHeight: 'calc(100vh - 80px)',
+          overflow: 'auto',
+        }}>
+          <Outlet />
+        </Content>
+      </Layout>
+    </Layout>
+  );
+};
+
+export default AppLayout;

@@ -1,0 +1,116 @@
+import api from './client';
+import type {
+  ApiResponse, LoginRequest, TokenResponse,
+  UserDto, CreateUserRequest,
+  ProjectDto, CreateProjectRequest,
+  WbsTaskDto, CreateWbsTaskRequest, UpdateWbsTaskRequest, UpdateProgressRequest,
+  TeamDto, ProjectMemberDto, AssignmentDto,
+} from '@/types';
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+export const authApi = {
+  login: (data: LoginRequest) =>
+    api.post<ApiResponse<TokenResponse>>('/auth/login', data).then(r => r.data.data),
+  logout: () =>
+    api.post<ApiResponse<null>>('/auth/logout').then(r => r.data),
+  refresh: (refreshToken: string) =>
+    api.post<ApiResponse<TokenResponse>>('/auth/refresh', {}, {
+      headers: { 'X-Refresh-Token': refreshToken },
+    }).then(r => r.data.data),
+  me: () =>
+    api.get<ApiResponse<string>>('/auth/me').then(r => r.data.data),
+};
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+export const userApi = {
+  findAll: () =>
+    api.get<ApiResponse<UserDto[]>>('/users').then(r => r.data.data),
+  findById: (id: number) =>
+    api.get<ApiResponse<UserDto>>(`/users/${id}`).then(r => r.data.data),
+  create: (data: CreateUserRequest) =>
+    api.post<ApiResponse<UserDto>>('/users', data).then(r => r.data.data),
+};
+
+// ─── Projects ─────────────────────────────────────────────────────────────────
+export const projectApi = {
+  findAll: () =>
+    api.get<ApiResponse<ProjectDto[]>>('/projects').then(r => r.data.data),
+  findById: (id: number) =>
+    api.get<ApiResponse<ProjectDto>>(`/projects/${id}`).then(r => r.data.data),
+  create: (data: CreateProjectRequest) =>
+    api.post<ApiResponse<ProjectDto>>('/projects', data).then(r => r.data.data),
+};
+
+// ─── WBS Tasks ────────────────────────────────────────────────────────────────
+export const wbsApi = {
+  getTaskList: (projectId: number) =>
+    api.get<ApiResponse<WbsTaskDto[]>>(`/projects/${projectId}/tasks`).then(r => r.data.data),
+  getTaskTree: (projectId: number) =>
+    api.get<ApiResponse<WbsTaskDto[]>>(`/projects/${projectId}/tasks/tree`).then(r => r.data.data),
+  createTask: (projectId: number, data: CreateWbsTaskRequest) =>
+    api.post<ApiResponse<WbsTaskDto>>(`/projects/${projectId}/tasks`, data).then(r => r.data.data),
+  updateTask: (projectId: number, taskId: number, data: UpdateWbsTaskRequest) =>
+    api.put<ApiResponse<WbsTaskDto>>(`/projects/${projectId}/tasks/${taskId}`, data).then(r => r.data.data),
+  updateProgress: (projectId: number, taskId: number, data: UpdateProgressRequest) =>
+    api.put<ApiResponse<WbsTaskDto>>(`/projects/${projectId}/tasks/${taskId}/progress`, data).then(r => r.data.data),
+  deleteTask: (projectId: number, taskId: number) =>
+    api.delete<ApiResponse<null>>(`/projects/${projectId}/tasks/${taskId}`).then(r => r.data),
+  reorderCodes: (projectId: number) =>
+    api.post<ApiResponse<null>>(`/projects/${projectId}/tasks/reorder-codes`).then(r => r.data),
+};
+
+// ─── Teams ────────────────────────────────────────────────────────────────────
+export const teamApi = {
+  getTeams: (projectId: number) =>
+    api.get<ApiResponse<TeamDto[]>>(`/projects/${projectId}/teams`).then(r => r.data.data),
+  createTeam: (projectId: number, data: { name: string; color?: string; leadUserId?: number }) =>
+    api.post<ApiResponse<TeamDto>>(`/projects/${projectId}/teams`, data).then(r => r.data.data),
+  deleteTeam: (projectId: number, teamId: number) =>
+    api.delete<ApiResponse<null>>(`/projects/${projectId}/teams/${teamId}`).then(r => r.data),
+};
+
+// ─── Project Members ──────────────────────────────────────────────────────────
+export const memberApi = {
+  getMembers: (projectId: number) =>
+    api.get<ApiResponse<ProjectMemberDto[]>>(`/projects/${projectId}/members`).then(r => r.data.data),
+  addMember: (projectId: number, userId: number, role = 'DEVELOPER') =>
+    api.post<ApiResponse<ProjectMemberDto>>(`/projects/${projectId}/members`, { userId, role }).then(r => r.data.data),
+  removeMember: (projectId: number, userId: number) =>
+    api.delete<ApiResponse<null>>(`/projects/${projectId}/members/${userId}`).then(r => r.data),
+};
+
+// ─── Assignments ──────────────────────────────────────────────────────────────
+export const assignApi = {
+  getAssignments: (projectId: number, taskId: number) =>
+    api.get<ApiResponse<AssignmentDto[]>>(`/projects/${projectId}/tasks/${taskId}/assignments`).then(r => r.data.data),
+  assign: (projectId: number, taskId: number, data: { userId: number; teamId?: number; workload?: number; roleLabel?: string }) =>
+    api.post<ApiResponse<AssignmentDto>>(`/projects/${projectId}/tasks/${taskId}/assignments`, data).then(r => r.data.data),
+  unassign: (projectId: number, taskId: number, userId: number) =>
+    api.delete<ApiResponse<null>>(`/projects/${projectId}/tasks/${taskId}/assignments/${userId}`).then(r => r.data),
+};
+
+// ─── Analysis ─────────────────────────────────────────────────────────────────
+export const analysisApi = {
+  getByAssignee: (projectId: number) =>
+    api.get(`/projects/${projectId}/analysis/by-assignee`).then(r => r.data.data),
+};
+
+// ─── Excel ────────────────────────────────────────────────────────────────────
+export const excelApi = {
+  importXlGantt: (projectId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post(`/projects/${projectId}/import/excel`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data);
+  },
+  exportExcel: (projectId: number, projectName: string) =>
+    api.get(`/projects/${projectId}/export/excel`, { responseType: 'blob' }).then(r => {
+      const url = window.URL.createObjectURL(new Blob([r.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `WBS_${projectName}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }),
+};

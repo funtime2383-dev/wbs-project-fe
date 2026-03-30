@@ -1,0 +1,62 @@
+import React, { Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ConfigProvider, Spin } from 'antd';
+import koKR from 'antd/locale/ko_KR';
+import dayjs from 'dayjs';
+import 'dayjs/locale/ko';
+import RequireAuth from '@/components/common/RequireAuth';
+import AppLayout from '@/components/common/AppLayout';
+
+dayjs.locale('ko');
+
+const LoginPage          = React.lazy(() => import('@/pages/auth/LoginPage'));
+const DashboardPage      = React.lazy(() => import('@/pages/dashboard/DashboardPage'));
+const SchedulePage       = React.lazy(() => import('@/pages/wbs/SchedulePage'));
+const ProgressPage       = React.lazy(() => import('@/pages/wbs/ProgressPage'));
+const WorkloadPage       = React.lazy(() => import('@/pages/wbs/WorkloadPage'));
+const TeamManagementPage = React.lazy(() => import('@/pages/team/TeamManagementPage'));
+const UserManagementPage = React.lazy(() => import('@/pages/admin/UserManagementPage'));
+const PermissionPage     = React.lazy(() => import('@/pages/admin/PermissionPage'));
+
+const Loading: React.FC = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+    <Spin size="large" />
+  </div>
+);
+
+const App: React.FC = () => (
+  <ConfigProvider
+    locale={koKR}
+    theme={{
+      token: { colorPrimary: '#2E75B6', borderRadius: 6 },
+      components: {
+        Menu: {
+          itemBg: '#1F4E79', itemColor: 'rgba(255,255,255,0.75)',
+          itemSelectedBg: '#2E75B6', itemSelectedColor: '#fff',
+          itemHoverBg: 'rgba(255,255,255,0.1)', itemHoverColor: '#fff',
+        },
+        Table: { headerBg: '#F0F5FF', headerColor: '#1F4E79' },
+      },
+    }}
+  >
+    <BrowserRouter>
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<RequireAuth><AppLayout /></RequireAuth>}>
+            <Route index element={<DashboardPage />} />
+            <Route path="wbs/schedule" element={<SchedulePage />} />
+            <Route path="wbs/progress" element={<ProgressPage />} />
+            <Route path="wbs/workload" element={<WorkloadPage />} />
+            <Route path="teams" element={<TeamManagementPage />} />
+            <Route path="admin/users" element={<UserManagementPage />} />
+            <Route path="admin/permissions" element={<PermissionPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  </ConfigProvider>
+);
+
+export default App;

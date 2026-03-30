@@ -1,0 +1,119 @@
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+export interface LoginRequest { username: string; password: string; }
+
+export interface UserDto {
+  userId: number; username: string; displayName: string;
+  email: string; phone?: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'LOCKED'; createdAt: string;
+}
+
+export interface TokenResponse {
+  accessToken: string; refreshToken: string; tokenType: string; user: UserDto;
+}
+
+export interface CreateUserRequest {
+  username: string; displayName: string; password: string; email: string; phone?: string;
+}
+
+// ─── Project ──────────────────────────────────────────────────────────────────
+export type ProjectStatus = 'ACTIVE' | 'COMPLETED' | 'SUSPENDED';
+export type ProjectRole =
+  | 'SYSTEM_ADMIN' | 'PROJECT_MANAGER' | 'TEAM_LEAD'
+  | 'DEVELOPER' | 'VIEWER' | 'REPORTER';
+
+export interface ProjectDto {
+  projectId: number; name: string; description?: string;
+  startDate: string; endDate: string; status: ProjectStatus; createdAt: string;
+}
+
+export interface CreateProjectRequest {
+  name: string; description?: string; startDate: string; endDate: string;
+}
+
+// ─── Team ─────────────────────────────────────────────────────────────────────
+export interface TeamDto {
+  teamId: number; projectId: number; name: string;
+  color?: string; leadUserId?: number; leadDisplayName?: string;
+}
+
+export interface ProjectMemberDto {
+  memberId: number; userId: number; username: string;
+  displayName: string; email: string; role: ProjectRole;
+}
+
+// ─── WBS Task ─────────────────────────────────────────────────────────────────
+export interface AssignmentDto {
+  assignmentId: number; userId: number; displayName: string;
+  teamId?: number; teamName?: string;
+  assignRate: number; workload: number; roleLabel?: string;
+}
+
+export interface WbsTaskDto {
+  taskId: number;
+  parentTaskId?: number;
+  wbsCode: string;
+  wbsLevel: number;
+  isGroup: boolean;
+  taskName: string;
+  plannedStart?: string;
+  plannedEnd?: string;
+  actualStart?: string;
+  actualEnd?: string;
+  totalWorkload: number;
+  plannedWorkload: number;
+  actualWorkload: number;
+  planProgress: number;
+  actualProgress: number;
+  weight: number;
+  deliverable?: string;
+  notes?: string;
+  displayOrder: number;
+  jiraIssueKey?: string;
+  assignments: AssignmentDto[];
+  children: WbsTaskDto[];
+  updatedAt: string;
+}
+
+export interface CreateWbsTaskRequest {
+  parentTaskId?: number;
+  taskName: string;
+  wbsCode?: string;
+  isGroup?: boolean;
+  plannedStart?: string;
+  plannedEnd?: string;
+  weight?: number;
+  deliverable?: string;
+  notes?: string;
+}
+
+export interface UpdateWbsTaskRequest {
+  taskName: string;
+  isGroup?: boolean;
+  plannedStart?: string;
+  plannedEnd?: string;
+  actualStart?: string;
+  actualEnd?: string;
+  totalWorkload?: number;
+  plannedWorkload?: number;
+  actualWorkload?: number;
+  planProgress?: number;
+  actualProgress?: number;
+  weight?: number;
+  deliverable?: string;
+  notes?: string;
+}
+
+export interface UpdateProgressRequest {
+  actualProgress: number;
+  actualStart?: string;
+  actualEnd?: string;
+  actualWorkload?: number;
+  comment?: string;
+}
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+export interface ApiResponse<T> { success: boolean; message?: string; data: T; }
+export interface ErrorResponse {
+  timestamp: string; status: number; error: string; message: string; path: string;
+  fieldErrors?: { field: string; message: string }[];
+}
